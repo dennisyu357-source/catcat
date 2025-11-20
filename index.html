@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>吉他咪的音乐之旅 - 升级版</title>
+    <title>吉他咪的音乐之旅 - 萌力全开版</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Zcool+KuaiLe&display=swap');
 
         body {
             margin: 0;
             padding: 0;
-            background-color: #fff; /* 初始背景 */
+            background-color: #fffbf0;
             overflow: hidden;
             font-family: 'Zcool KuaiLe', sans-serif, cursive;
             touch-action: none;
@@ -18,12 +18,33 @@
             -webkit-user-select: none;
         }
 
-        #gameCanvas {
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            background: linear-gradient(to bottom, #fff1eb 0%, #ace0f9 100%);
+            transition: filter 0.1s;
+        }
+
+        canvas {
             display: block;
             width: 100%;
             height: 100%;
         }
 
+        /* 噪点纹理层，模拟纸张质感 */
+        #texture-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MDAiIGhlaWdodD0iNTAwIj48ZmlsdGVyIGlkPSJub2lzZSI+PGZlVHVyYnVsZW5jZSB0eXBlPSJmcmFjdGFsTm9pc2UiIGJhc2VGcmVxdWVuY3k9IjAuNjUiIG51bU9jdGF2ZXM9IjMiIHN0aXRjaFRpbGVzPSJzdGl0Y2giLz48L2ZpbHRlcj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWx0ZXI9InVybCgjbm9pc2UpIiBvcGFjaXR5PSIwLjAzIi8+PC9zdmc+');
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        /* UI 层 */
         #ui-layer {
             position: absolute;
             top: 0;
@@ -31,729 +52,817 @@
             width: 100%;
             height: 100%;
             pointer-events: none;
+            z-index: 20;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            text-align: center;
-            transition: opacity 0.3s;
         }
 
-        .title {
-            font-size: 40px;
-            color: #333;
-            text-shadow: 2px 2px 0px #eee;
-            margin-bottom: 20px;
-            animation: float 3s ease-in-out infinite;
-        }
-
-        .subtitle {
-            font-size: 18px;
-            color: #555;
-            margin-bottom: 40px;
-            background: rgba(255,255,255,0.9);
-            padding: 8px 20px;
-            border-radius: 20px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-        }
-
-        .score-board {
+        .hud {
             position: absolute;
             top: 20px;
-            right: 20px;
-            font-size: 24px;
-            color: #333;
-            background: rgba(255,255,255,0.8);
-            padding: 5px 10px;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 20px;
+            box-sizing: border-box;
+        }
+
+        .score-box {
+            font-size: 28px;
+            color: #ff6b81;
+            text-shadow: 2px 2px 0 #fff;
+        }
+
+        /* 能量槽容器 */
+        .fever-container {
+            width: 150px;
+            height: 20px;
+            background: rgba(255,255,255,0.5);
+            border: 2px solid #333;
             border-radius: 10px;
-            pointer-events: none;
+            overflow: hidden;
+            position: relative;
         }
 
-        /* 护盾UI */
-        .shield-status {
+        .fever-bar {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #ff9a9e 0%, #fecfef 99%, #feada6 100%);
+            transition: width 0.2s;
+        }
+
+        .fever-text {
             position: absolute;
-            top: 20px;
-            left: 20px;
-            font-size: 20px;
-            color: #4a90e2;
-            display: none; /* 默认隐藏 */
-            align-items: center;
-            gap: 5px;
-            pointer-events: none;
+            width: 100%;
+            text-align: center;
+            top: 0;
+            line-height: 20px;
+            font-size: 12px;
+            color: #333;
+            font-weight: bold;
         }
 
-        @keyframes float {
-            0% { transform: translateY(0px); }
-            50% { transform: translateY(-10px); }
-            100% { transform: translateY(0px); }
+        /* 弹窗样式 */
+        .panel {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px 50px;
+            border-radius: 30px;
+            border: 4px solid #333;
+            box-shadow: 10px 10px 0px rgba(0,0,0,0.1);
+            text-align: center;
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            pointer-events: auto;
+        }
+
+        .btn {
+            background: #ff6b81;
+            color: white;
+            border: none;
+            padding: 10px 30px;
+            font-size: 24px;
+            border-radius: 50px;
+            font-family: 'Zcool KuaiLe', sans-serif;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: transform 0.1s;
+            box-shadow: 0 4px 0 #c44556;
+        }
+
+        .btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 0 0 #c44556;
+        }
+
+        /* 里程碑提示 */
+        #milestone-msg {
+            position: absolute;
+            top: 30%;
+            width: 100%;
+            text-align: center;
+            font-size: 40px;
+            color: #ff9f43;
+            text-shadow: 3px 3px 0 #fff;
+            opacity: 0;
+            transform: scale(0.5);
+            transition: all 0.5s;
+        }
+
+        .combo-text {
+            position: absolute;
+            right: 20px;
+            top: 60px;
+            font-size: 20px;
+            color: #2ed573;
+            font-weight: bold;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: opacity 0.2s, transform 0.2s;
+        }
+
+        @keyframes popIn {
+            from { transform: scale(0.5) rotate(-5deg); opacity: 0; }
+            to { transform: scale(1) rotate(0deg); opacity: 1; }
         }
 
         @keyframes shake {
-            0% { transform: translate(1px, 1px) rotate(0deg); }
-            10% { transform: translate(-1px, -2px) rotate(-1deg); }
-            20% { transform: translate(-3px, 0px) rotate(1deg); }
-            30% { transform: translate(3px, 2px) rotate(0deg); }
-            40% { transform: translate(1px, -1px) rotate(1deg); }
-            50% { transform: translate(-1px, 2px) rotate(-1deg); }
-            60% { transform: translate(-3px, 1px) rotate(0deg); }
-            70% { transform: translate(3px, 1px) rotate(-1deg); }
-            80% { transform: translate(-1px, -1px) rotate(1deg); }
-            90% { transform: translate(1px, 2px) rotate(0deg); }
-            100% { transform: translate(1px, -2px) rotate(-1deg); }
+            0%, 100% { transform: translate(0, 0); }
+            25% { transform: translate(-5px, 5px); }
+            75% { transform: translate(5px, -5px); }
         }
 
-        .shake-screen {
-            animation: shake 0.5s;
-            animation-iteration-count: 1;
+        .fever-mode-bg {
+            animation: rainbowBg 2s infinite alternate;
         }
+
+        @keyframes rainbowBg {
+            0% { background: #ff9a9e; }
+            25% { background: #fad0c4; }
+            50% { background: #a18cd1; }
+            75% { background: #fbc2eb; }
+            100% { background: #8fd3f4; }
+        }
+
     </style>
 </head>
 <body>
 
-    <div id="ui-layer">
-        <div id="start-screen">
-            <div class="title">🎸 吉他咪的音乐之旅 🎵</div>
-            <div class="subtitle">点击跳跃 / 空中再次点击二段跳</div>
-            <div style="font-size: 20px; color: #ff6b6b; animation: blink 1s infinite;">点击屏幕开始</div>
-        </div>
-        <div id="game-over-screen" style="display: none;">
-            <div class="title" style="color:#ff4757">哎呀！走音了！</div>
-            <div class="subtitle" id="final-score">得分: 0</div>
-            <div style="font-size: 20px; color: #333;">点击任意处重试</div>
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+        <div id="texture-overlay"></div>
+        
+        <div id="ui-layer">
+            <div class="hud">
+                <div class="score-box">♪ <span id="score">0</span></div>
+                <div class="fever-container">
+                    <div class="fever-bar" id="fever-bar"></div>
+                    <div class="fever-text">FEVER 能量</div>
+                </div>
+            </div>
+
+            <div id="milestone-msg">SPEED UP!</div>
+            <div id="combo-msg" class="combo-text">Combo x2!</div>
+
+            <div id="start-screen" class="panel">
+                <h1 style="color:#ff6b81; font-size: 40px; margin:0;">🎸 吉他咪的音乐之旅</h1>
+                <p style="color:#555;">点击跳跃 • 空中二段跳 • 收集星星开启FEVER!</p>
+                <button class="btn" onclick="game.start()">开始演奏 (好吧！)</button>
+            </div>
+
+            <div id="game-over-screen" class="panel" style="display: none;">
+                <h1 style="color:#333;">演出结束</h1>
+                <p style="font-size: 24px;">得分: <span id="final-score" style="color:#ff6b81">0</span></p>
+                <p id="rank-text" style="font-size:16px; color:#888;">吉他新手</p>
+                <button class="btn" onclick="game.start()">再来一次 (讨厌你！)</button>
+            </div>
         </div>
     </div>
 
-    <div class="score-board">✨ <span id="score">0</span></div>
-    <div class="shield-status" id="shield-ui">🛡️ 护盾激活</div>
-    <canvas id="gameCanvas"></canvas>
-
     <script>
-        // --- 游戏设置与初始化 ---
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        const uiLayer = document.getElementById('ui-layer');
-        const startScreen = document.getElementById('start-screen');
-        const gameOverScreen = document.getElementById('game-over-screen');
-        const scoreEl = document.getElementById('score');
-        const finalScoreEl = document.getElementById('final-score');
-        const shieldUi = document.getElementById('shield-ui');
+        // --- 音频系统 (萌系BGM & SFX) ---
+        const AudioSys = {
+            ctx: null,
+            bgmOscs: [],
+            bgmInterval: null,
+            isPlaying: false,
+            isFever: false,
+            
+            init() {
+                if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                if (this.ctx.state === 'suspended') this.ctx.resume();
+            },
 
-        let width, height;
-        let frameId;
-        let score = 0;
-        
-        // 时间控制 (Delta Time)
-        let lastTime = 0;
-        let speedMultiplier = 1; // 随时间增加难度
+            playTone(freq, type = 'triangle', duration = 0.3, vol = 0.1, time = 0) {
+                if (!this.ctx) return;
+                const t = time || this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = type;
+                osc.frequency.value = freq;
+                
+                gain.gain.setValueAtTime(0, t);
+                gain.gain.linearRampToValueAtTime(vol, t + 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
 
-        let state = 'START'; // START, PLAYING, GAMEOVER
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(t);
+                osc.stop(t + duration);
+            },
 
-        // 物理常数 (基于60FPS标准化的数值)
-        const BASE_SPEED = 300; // 像素/秒
-        const GRAVITY = 1800;   // 像素/秒^2
-        const JUMP_FORCE = -750;
-        const GROUND_H = 100;
+            // 萌萌哒背景音乐循环
+            startBGM() {
+                if (this.bgmInterval) clearInterval(this.bgmInterval);
+                let beat = 0;
+                // C大调欢快旋律
+                const melody = [
+                    523.25, 0, 659.25, 523.25, 783.99, 0, 659.25, 0, 
+                    880.00, 783.99, 659.25, 523.25, 587.33, 0, 392.00, 0
+                ];
+                
+                const playBeat = () => {
+                    const speed = this.isFever ? 150 : 250; // Fever时加速
+                    const freq = melody[beat % melody.length];
+                    
+                    if (freq > 0) {
+                        // 主旋律 (叮叮咚咚的音色)
+                        this.playTone(freq, 'sine', 0.2, 0.05);
+                        // 伴奏
+                        if (beat % 4 === 0) this.playTone(261.63, 'triangle', 0.4, 0.03);
+                    }
+                    beat++;
+                    this.bgmInterval = setTimeout(playBeat, speed);
+                };
+                playBeat();
+            },
 
-        // 角色：吉他咪
-        const mimi = {
-            x: 50,
-            y: 0,
-            w: 60,
-            h: 60,
-            dy: 0, // 垂直速度
-            grounded: false,
-            jumpCount: 0, // 二段跳计数
-            maxJumps: 2,
-            hasShield: false,
-            phrase: "", 
-            phraseTimer: 0,
-            invincibleTimer: 0 // 受伤后的短暂无敌
+            stopBGM() {
+                if (this.bgmInterval) clearTimeout(this.bgmInterval);
+            },
+
+            playJump() { 
+                this.playTone(440, 'triangle', 0.2, 0.1); 
+                // 滑音效果
+                if(this.ctx) {
+                   const osc = this.ctx.createOscillator();
+                   const gain = this.ctx.createGain();
+                   osc.frequency.setValueAtTime(300, this.ctx.currentTime);
+                   osc.frequency.linearRampToValueAtTime(600, this.ctx.currentTime + 0.2);
+                   gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+                   gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.2);
+                   osc.connect(gain); gain.connect(this.ctx.destination);
+                   osc.start(); osc.stop(this.ctx.currentTime+0.2);
+                }
+            },
+            
+            playCollect() { this.playTone(1046.50, 'sine', 0.3, 0.1); }, // High C
+            playCrash() { 
+                this.playTone(100, 'sawtooth', 0.5, 0.2); 
+                this.playTone(80, 'square', 0.5, 0.2); 
+            },
+            playFeverStart() {
+                // 爬音阶特效
+                for(let i=0; i<8; i++) {
+                    this.playTone(261.63 + i*50, 'square', 0.1, 0.1, this.ctx.currentTime + i*0.05);
+                }
+            }
         };
 
-        // 游戏对象
-        let obstacles = [];
-        let items = []; // 星星和护盾
-        let particles = [];
-        let bgElements = []; // 云朵、山脉
+        // --- 游戏引擎 ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const ui = {
+            start: document.getElementById('start-screen'),
+            gameOver: document.getElementById('game-over-screen'),
+            score: document.getElementById('score'),
+            finalScore: document.getElementById('final-score'),
+            rankText: document.getElementById('rank-text'),
+            container: document.getElementById('game-container'),
+            feverBar: document.getElementById('fever-bar'),
+            milestone: document.getElementById('milestone-msg'),
+            combo: document.getElementById('combo-msg')
+        };
 
-        // 音频上下文
-        let audioCtx;
-        // C大调五声 + 高八度
-        const scale = [261.6, 293.6, 329.6, 392.0, 440.0, 523.2, 587.3, 659.2]; 
-        let noteIndex = 0;
+        let width, height;
 
-        // --- 核心功能函数 ---
-
-        function resize() {
-            width = window.innerWidth;
-            height = window.innerHeight;
-            canvas.width = width;
-            canvas.height = height;
-            if (state === 'START') {
-                mimi.y = height - GROUND_H - mimi.h;
-                mimi.x = width * 0.15;
-            }
-        }
-
-        function initAudio() {
-            if (!audioCtx) {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            }
-        }
-
-        // 播放吉他音（加入随机轻微失谐，更有手感）
-        function playGuitarNote(isDoubleJump) {
-            if (!audioCtx) return;
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            
-            osc.type = 'triangle'; // 三角波接近吉他/长笛
-            
-            // 音高选择
-            let freq = scale[noteIndex % scale.length];
-            if (isDoubleJump) freq *= 1.5; // 二段跳音高更高
-            
-            osc.frequency.value = freq;
-            noteIndex++;
-
-            // 音量包络
-            const now = audioCtx.currentTime;
-            gain.gain.setValueAtTime(0, now);
-            gain.gain.linearRampToValueAtTime(0.2, now + 0.02);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
-
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.start();
-            osc.stop(now + 0.6);
-        }
-
-        function playSoundEffect(type) {
-            if (!audioCtx) return;
-            const now = audioCtx.currentTime;
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            
-            if (type === 'collect') { // 叮
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(880, now);
-                osc.frequency.exponentialRampToValueAtTime(1760, now + 0.1);
-                gain.gain.setValueAtTime(0.1, now);
-                gain.gain.linearRampToValueAtTime(0, now + 0.2);
-            } else if (type === 'shield') { // 护盾音效
-                osc.type = 'square';
-                osc.frequency.setValueAtTime(440, now);
-                osc.frequency.linearRampToValueAtTime(660, now + 0.2);
-                gain.gain.setValueAtTime(0.05, now);
-                gain.gain.linearRampToValueAtTime(0, now + 0.3);
-            } else if (type === 'crash') { // 撞击
-                osc.type = 'sawtooth';
-                osc.frequency.value = 100;
-                osc.frequency.linearRampToValueAtTime(20, now + 0.4);
-                gain.gain.setValueAtTime(0.3, now);
-                gain.gain.linearRampToValueAtTime(0, now + 0.4);
-            } else if (type === 'break_shield') { // 碎盾
-                osc.type = 'sawtooth';
-                osc.frequency.setValueAtTime(300, now);
-                osc.frequency.linearRampToValueAtTime(100, now + 0.2);
-                gain.gain.setValueAtTime(0.2, now);
-                gain.gain.linearRampToValueAtTime(0, now + 0.2);
-            }
-
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.start();
-            osc.stop(now + 0.5);
-        }
-
-        // 手绘风格抖动
-        function j(val, intensity = 1.5) {
-            return val + (Math.random() - 0.5) * intensity;
-        }
-
-        // --- 绘制函数 ---
-
-        function drawMimi(ctx, x, y, w, h) {
-            ctx.save();
-            ctx.translate(x + w/2, y + h/2);
-            
-            // 受伤闪烁
-            if (mimi.invincibleTimer > 0 && Math.floor(Date.now()/50)%2===0) {
-                ctx.globalAlpha = 0.5;
-            }
-
-            // 跑步/跳跃姿态
-            if (state === 'PLAYING' && mimi.grounded) {
-                ctx.rotate(Math.sin(Date.now() / 80) * 0.15);
-            } else {
-                // 二段跳翻滚
-                if (mimi.jumpCount === 2) {
-                    ctx.rotate(Date.now() / 100); 
-                } else {
-                    ctx.rotate(-0.1); // 普通跳跃前倾
-                }
-            }
-
-            // 护盾光环
-            if (mimi.hasShield) {
-                ctx.beginPath();
-                ctx.arc(0, 0, w/2 + 10, 0, Math.PI * 2);
-                ctx.strokeStyle = `rgba(74, 144, 226, ${0.5 + Math.sin(Date.now()/200)*0.2})`;
-                ctx.lineWidth = 4;
-                ctx.stroke();
-            }
-
-            // 身体
+        // 帮助函数：手绘抖动线条
+        function drawSketchLine(ctx, x1, y1, x2, y2, color, width = 2) {
             ctx.beginPath();
-            ctx.fillStyle = '#fff';
-            ctx.strokeStyle = '#222';
-            ctx.lineWidth = 3;
-            ctx.ellipse(0, 5, w/2, h/2 - 5, 0, 0, Math.PI * 2);
-            ctx.fill(); ctx.stroke();
-
-            // 耳朵
-            const drawEar = (direction) => {
-                ctx.beginPath();
-                const d = direction; // -1 or 1
-                ctx.moveTo(j(d*20), j(-20));
-                ctx.lineTo(j(d*25), j(-35));
-                ctx.lineTo(j(d*10), j(-25));
-                ctx.fillStyle = '#fff'; ctx.fill(); ctx.stroke();
-            };
-            drawEar(-1); drawEar(1);
-
-            // 表情
-            ctx.fillStyle = '#000';
-            if (state === 'GAMEOVER') {
-                // 晕倒眼 x x
-                ctx.font = "20px Arial";
-                ctx.fillText("x", -20, 0);
-                ctx.fillText("x", 10, 0);
-            } else {
-                // 豆豆眼
-                ctx.beginPath(); ctx.arc(j(-12), j(-5), 3, 0, Math.PI*2); ctx.fill();
-                ctx.beginPath(); ctx.arc(j(12), j(-5), 3, 0, Math.PI*2); ctx.fill();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = width;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            
+            // 模拟手绘的不规则
+            const segments = 4;
+            ctx.moveTo(x1, y1);
+            for (let i = 1; i <= segments; i++) {
+                const t = i / segments;
+                const x = x1 + (x2 - x1) * t + (Math.random() - 0.5) * 2;
+                const y = y1 + (y2 - y1) * t + (Math.random() - 0.5) * 2;
+                ctx.lineTo(x, y);
             }
-
-            // 腮红
-            ctx.fillStyle = '#ffb7b2';
-            ctx.globalAlpha = 0.8;
-            ctx.beginPath(); ctx.arc(j(-18), j(2), 5, 0, Math.PI*2); ctx.fill();
-            ctx.beginPath(); ctx.arc(j(18), j(2), 5, 0, Math.PI*2); ctx.fill();
-            ctx.globalAlpha = 1.0;
-
-            // 吉他
-            ctx.save();
-            ctx.rotate(-0.3);
-            ctx.fillStyle = '#ffafc0';
-            ctx.strokeStyle = '#222';
-            ctx.beginPath(); ctx.arc(8, 18, 14, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-            ctx.fillStyle = '#555';
-            ctx.fillRect(13, 13, 28, 7); // 琴颈
-            ctx.fillStyle = '#fff'; // 琴弦
-            ctx.fillRect(15, 15, 20, 1);
-            ctx.restore();
-
-            // 手
-            ctx.strokeStyle = '#222';
-            ctx.beginPath(); ctx.arc(-12, 12, 6, 0, Math.PI); ctx.stroke();
-            ctx.beginPath(); ctx.arc(12, 14, 6, 0, Math.PI); ctx.stroke();
-
-            ctx.restore();
+            ctx.stroke();
         }
 
-        // 背景绘制 (视差滚动)
-        function drawBackground(ctx) {
-            // 天空
-            const grad = ctx.createLinearGradient(0, 0, 0, height);
-            grad.addColorStop(0, '#e0f7fa');
-            grad.addColorStop(1, '#ffffff');
-            ctx.fillStyle = grad;
-            ctx.fillRect(0,0, width, height);
-
-            // 绘制背景元素
-            bgElements.forEach(el => {
-                ctx.fillStyle = el.type === 'cloud' ? 'rgba(255,255,255,0.8)' : '#dcedc8';
-                ctx.beginPath();
-                if (el.type === 'cloud') {
-                    ctx.arc(el.x, el.y, el.size, 0, Math.PI*2);
-                    ctx.arc(el.x + el.size, el.y - el.size*0.5, el.size*0.8, 0, Math.PI*2);
-                    ctx.arc(el.x + el.size*2, el.y, el.size*0.9, 0, Math.PI*2);
-                } else {
-                    // 山
-                    ctx.moveTo(el.x, height - GROUND_H);
-                    ctx.lineTo(el.x + el.size, height - GROUND_H - el.size);
-                    ctx.lineTo(el.x + el.size*2, height - GROUND_H);
-                }
+        function drawSketchCircle(ctx, x, y, r, color, fill = false) {
+            ctx.beginPath();
+            // 用多边形模拟圆，更加手绘感
+            const points = 12;
+            for (let i = 0; i <= points; i++) {
+                const angle = (i / points) * Math.PI * 2;
+                const rJitter = r + (Math.random() - 0.5) * 2;
+                const px = x + Math.cos(angle) * rJitter;
+                const py = y + Math.sin(angle) * rJitter;
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            if (fill) {
+                ctx.fillStyle = color;
                 ctx.fill();
-            });
-        }
-
-        // --- 逻辑更新 (Delta Time) ---
-        
-        function update(dt) {
-            // dt 是秒为单位 (例如 0.016)
-            if (state !== 'PLAYING') return;
-
-            // 难度随时间缓慢增加
-            speedMultiplier += dt * 0.02;
-            const currentSpeed = BASE_SPEED * speedMultiplier;
-
-            // 背景生成
-            if (Math.random() < 0.02) {
-                bgElements.push({
-                    x: width + 100,
-                    y: Math.random() * height * 0.5,
-                    size: 30 + Math.random() * 50,
-                    speed: 20 + Math.random() * 30, // 慢速
-                    type: Math.random() > 0.5 ? 'cloud' : 'mountain'
-                });
-            }
-
-            // 背景移动
-            for (let i = bgElements.length - 1; i >= 0; i--) {
-                let el = bgElements[i];
-                el.x -= el.speed * dt;
-                if (el.x < -200) bgElements.splice(i, 1);
-            }
-
-            // 咪的物理
-            mimi.dy += GRAVITY * dt;
-            mimi.y += mimi.dy * dt;
-
-            // 地面检测
-            if (mimi.y + mimi.h > height - GROUND_H) {
-                mimi.y = height - GROUND_H - mimi.h;
-                mimi.dy = 0;
-                mimi.grounded = true;
-                mimi.jumpCount = 0; // 重置多段跳
-            } else {
-                mimi.grounded = false;
-            }
-            
-            // 无敌时间倒计时
-            if (mimi.invincibleTimer > 0) mimi.invincibleTimer -= dt;
-
-            // 障碍物生成 (走音符)
-            // 间隔生成：距离越远生成概率越高，避免重叠
-            const lastObs = obstacles[obstacles.length-1];
-            let minSafeDist = 400;
-            if (!lastObs || (width - lastObs.x > minSafeDist)) {
-                if (Math.random() < 0.015 * speedMultiplier) {
-                    obstacles.push({
-                        x: width,
-                        y: height - GROUND_H - 40,
-                        w: 30,
-                        h: 40,
-                        type: 'note'
-                    });
-                }
-            }
-
-            // 物品生成 (星星 & 护盾)
-            if (Math.random() < 0.01) {
-                const isShield = Math.random() < 0.1; // 10%概率出护盾
-                items.push({
-                    x: width,
-                    y: height - GROUND_H - 80 - Math.random() * 120,
-                    w: 30,
-                    h: 30,
-                    type: isShield ? 'shield' : 'star',
-                    angle: 0
-                });
-            }
-
-            // 更新障碍物
-            for (let i = obstacles.length - 1; i >= 0; i--) {
-                let obs = obstacles[i];
-                obs.x -= currentSpeed * dt;
-
-                // 碰撞检测 (稍微缩小判定框)
-                const hitMargin = 10;
-                if (mimi.invincibleTimer <= 0 &&
-                    mimi.x + hitMargin < obs.x + obs.w - hitMargin &&
-                    mimi.x + mimi.w - hitMargin > obs.x + hitMargin &&
-                    mimi.y + hitMargin < obs.y + obs.h - hitMargin &&
-                    mimi.y + mimi.h - hitMargin > obs.y + hitMargin
-                ) {
-                    if (mimi.hasShield) {
-                        // 护盾碎裂逻辑
-                        mimi.hasShield = false;
-                        mimi.invincibleTimer = 1.0; // 无敌1秒
-                        shieldUi.style.display = 'none';
-                        playSoundEffect('break_shield');
-                        createParticles(mimi.x, mimi.y, '#4a90e2', 10);
-                        mimi.phrase = "好险！";
-                        mimi.phraseTimer = 60;
-                    } else {
-                        gameOver();
-                    }
-                }
-
-                if (obs.x + obs.w < 0) obstacles.splice(i, 1);
-            }
-
-            // 更新物品
-            for (let i = items.length - 1; i >= 0; i--) {
-                let item = items[i];
-                item.x -= currentSpeed * dt;
-                item.angle += 2 * dt;
-
-                if (
-                    mimi.x < item.x + item.w &&
-                    mimi.x + mimi.w > item.x &&
-                    mimi.y < item.y + item.h &&
-                    mimi.y + mimi.h > item.y
-                ) {
-                    if (item.type === 'star') {
-                        score += 10;
-                        scoreEl.innerText = score;
-                        createParticles(item.x, item.y, '#ffd700', 5);
-                        playSoundEffect('collect');
-                    } else if (item.type === 'shield') {
-                        mimi.hasShield = true;
-                        shieldUi.style.display = 'flex';
-                        createParticles(item.x, item.y, '#4a90e2', 8);
-                        playSoundEffect('shield');
-                        mimi.phrase = "安全感！";
-                        mimi.phraseTimer = 60;
-                    }
-                    items.splice(i, 1);
-                } else if (item.x < -50) {
-                    items.splice(i, 1);
-                }
-            }
-
-            // 更新粒子
-            for (let i = particles.length - 1; i >= 0; i--) {
-                let p = particles[i];
-                p.x += p.vx * dt * 60; // Normalize to frames
-                p.y += p.vy * dt * 60;
-                p.life -= dt * 60;
-                if (p.life <= 0) particles.splice(i, 1);
-            }
-        }
-
-        function createParticles(x, y, color, count) {
-            for (let i = 0; i < count; i++) {
-                particles.push({
-                    x: x,
-                    y: y,
-                    vx: (Math.random() - 0.5) * 8,
-                    vy: (Math.random() - 0.5) * 8,
-                    life: 30 + Math.random() * 20,
-                    color: color
-                });
-            }
-        }
-
-        // 绘制循环
-        function draw() {
-            ctx.clearRect(0, 0, width, height);
-
-            drawBackground(ctx);
-
-            // 地面
-            ctx.beginPath();
-            ctx.moveTo(0, height - GROUND_H);
-            for(let i=0; i<width; i+=20) {
-                ctx.lineTo(i, height - GROUND_H + j(0));
-            }
-            ctx.lineTo(width, height);
-            ctx.lineTo(0, height);
-            ctx.fillStyle = '#fcfcfc';
-            ctx.fill();
-            
-            // 地面描边
-            ctx.beginPath();
-            ctx.moveTo(0, height - GROUND_H);
-            for(let i=0; i<width; i+=20) {
-                ctx.lineTo(i, height - GROUND_H + j(0));
             }
             ctx.strokeStyle = '#333';
             ctx.lineWidth = 2;
             ctx.stroke();
+        }
 
-            // 绘制障碍物
-            obstacles.forEach(obs => {
-                ctx.fillStyle = '#333';
-                ctx.font = "36px Arial";
-                ctx.fillText("♩", obs.x, obs.y + 35);
-                // 涂鸦杂线
-                ctx.strokeStyle = '#ff4757';
-                ctx.lineWidth = 2;
+        class Game {
+            constructor() {
+                this.resize();
+                window.addEventListener('resize', () => this.resize());
+                this.reset();
+                this.loop = this.loop.bind(this);
+                requestAnimationFrame(this.loop);
+            }
+
+            resize() {
+                width = canvas.width = window.innerWidth;
+                height = canvas.height = window.innerHeight;
+                this.groundY = height - 100;
+            }
+
+            reset() {
+                this.state = 'START';
+                this.score = 0;
+                this.combo = 0;
+                this.feverEnergy = 0;
+                this.isFever = false;
+                this.feverTimer = 0;
+                this.speed = 300; // 像素/秒
+                this.lastTime = 0;
+                
+                this.mimi = {
+                    x: width * 0.15,
+                    y: 0,
+                    w: 60,
+                    h: 60,
+                    dy: 0,
+                    grounded: false,
+                    jumpCount: 0,
+                    phrase: "",
+                    phraseTimer: 0
+                };
+                
+                this.obstacles = [];
+                this.stars = [];
+                this.particles = [];
+                this.bgDecor = []; // 云朵、音符背景
+                
+                // 初始化背景元素
+                for(let i=0; i<5; i++) this.addBgDecor(Math.random()*width);
+            }
+
+            start() {
+                AudioSys.init();
+                AudioSys.startBGM();
+                this.reset();
+                this.state = 'PLAYING';
+                this.mimi.y = this.groundY - this.mimi.h;
+                this.mimi.grounded = true;
+                this.setPhrase("好吧！", 100);
+                
+                ui.start.style.display = 'none';
+                ui.gameOver.style.display = 'none';
+                ui.container.className = ''; // 清除Fever背景
+                this.lastTime = performance.now();
+            }
+
+            gameOver() {
+                this.state = 'GAMEOVER';
+                AudioSys.stopBGM();
+                AudioSys.playCrash();
+                this.setPhrase("讨厌你！", 200);
+                
+                // 屏幕震动
+                ui.container.style.animation = 'shake 0.5s';
+                setTimeout(() => ui.container.style.animation = '', 500);
+
+                setTimeout(() => {
+                    ui.finalScore.innerText = Math.floor(this.score);
+                    // 评级系统
+                    let rank = "吉他新手 🎸";
+                    if (this.score > 500) rank = "街头艺人 🎵";
+                    if (this.score > 1500) rank = "摇滚巨星 🌟";
+                    if (this.score > 3000) rank = "音乐之神 👑";
+                    ui.rankText.innerText = rank;
+                    ui.gameOver.style.display = 'block';
+                }, 1000);
+            }
+
+            setPhrase(text, time) {
+                this.mimi.phrase = text;
+                this.mimi.phraseTimer = time;
+            }
+
+            addBgDecor(startX) {
+                this.bgDecor.push({
+                    x: startX || width + 50,
+                    y: Math.random() * (height/2),
+                    type: Math.random() > 0.5 ? 'cloud' : 'note',
+                    speed: 20 + Math.random() * 30,
+                    size: 20 + Math.random() * 30
+                });
+            }
+
+            triggerFever() {
+                if (this.isFever) return;
+                this.isFever = true;
+                this.feverTimer = 5000; // 5秒狂热
+                AudioSys.isFever = true;
+                AudioSys.playFeverStart();
+                this.setPhrase("Rock n Roll!", 120);
+                ui.container.classList.add('fever-mode-bg');
+                
+                // 消除屏幕内障碍
+                this.obstacles = []; 
+            }
+
+            endFever() {
+                this.isFever = false;
+                this.feverEnergy = 0;
+                AudioSys.isFever = false;
+                ui.container.classList.remove('fever-mode-bg');
+                this.setPhrase("呼...", 60);
+            }
+
+            showMilestone(text) {
+                ui.milestone.innerText = text;
+                ui.milestone.style.opacity = 1;
+                ui.milestone.style.transform = "scale(1.2)";
+                setTimeout(() => {
+                    ui.milestone.style.opacity = 0;
+                    ui.milestone.style.transform = "scale(0.5)";
+                }, 1000);
+            }
+
+            showCombo(count) {
+                ui.combo.innerText = `Combo x${count}!`;
+                ui.combo.style.opacity = 1;
+                ui.combo.style.transform = "translateY(0)";
+                setTimeout(() => {
+                    ui.combo.style.opacity = 0;
+                    ui.combo.style.transform = "translateY(10px)";
+                }, 800);
+            }
+
+            update(dt) {
+                if (this.state !== 'PLAYING') return;
+
+                // 难度成长
+                const difficulty = 1 + (this.score / 5000);
+                const currentSpeed = (this.isFever ? this.speed * 1.5 : this.speed) * difficulty;
+
+                // Fever 逻辑
+                if (this.isFever) {
+                    this.feverTimer -= dt * 1000;
+                    this.score += dt * 20; // Fever自动加分
+                    if (this.feverTimer <= 0) this.endFever();
+                }
+
+                // 更新UI条
+                ui.score.innerText = Math.floor(this.score);
+                ui.feverBar.style.width = Math.min(100, this.feverEnergy) + '%';
+                if (this.feverEnergy >= 100 && !this.isFever) this.triggerFever();
+
+                // 物理
+                const gravity = 1800;
+                this.mimi.dy += gravity * dt;
+                this.mimi.y += this.mimi.dy * dt;
+
+                if (this.mimi.y + this.mimi.h > this.groundY) {
+                    this.mimi.y = this.groundY - this.mimi.h;
+                    this.mimi.dy = 0;
+                    this.mimi.grounded = true;
+                    this.mimi.jumpCount = 0;
+                    this.combo = 0; // 落地重置Combo? 或者碰到障碍重置? 保持简单，落地不重置
+                } else {
+                    this.mimi.grounded = false;
+                }
+
+                // 背景
+                if(Math.random() < 0.02) this.addBgDecor();
+                this.bgDecor.forEach((bg, i) => {
+                    bg.x -= bg.speed * dt * (this.isFever?2:1);
+                    if(bg.x < -100) this.bgDecor.splice(i, 1);
+                });
+
+                // 障碍物生成 (Fever模式不生成障碍)
+                if (!this.isFever) {
+                    if (this.obstacles.length === 0 || width - this.obstacles[this.obstacles.length-1].x > 300 + Math.random()*200) {
+                        if (Math.random() < 0.02 * difficulty) {
+                            this.obstacles.push({
+                                x: width,
+                                y: this.groundY - 40,
+                                w: 30,
+                                h: 40,
+                                type: 'note' // 走音符
+                            });
+                        }
+                    }
+                }
+
+                // 星星生成 (Fever模式疯狂生成)
+                const starRate = this.isFever ? 0.1 : 0.01;
+                if (Math.random() < starRate) {
+                    this.stars.push({
+                        x: width,
+                        y: this.groundY - 60 - Math.random() * 150,
+                        w: 30,
+                        h: 30,
+                        val: 10
+                    });
+                }
+
+                // 更新障碍
+                for (let i = this.obstacles.length - 1; i >= 0; i--) {
+                    let obs = this.obstacles[i];
+                    obs.x -= currentSpeed * dt;
+                    
+                    // 碰撞
+                    if (this.checkCollision(this.mimi, obs)) {
+                        this.gameOver();
+                    }
+                    if (obs.x < -50) this.obstacles.splice(i, 1);
+                }
+
+                // 更新星星
+                for (let i = this.stars.length - 1; i >= 0; i--) {
+                    let s = this.stars[i];
+                    s.x -= currentSpeed * dt;
+                    
+                    if (this.checkCollision(this.mimi, s)) {
+                        this.score += s.val * (this.isFever ? 2 : 1);
+                        this.feverEnergy += 5; // 20个星星充满
+                        this.combo++;
+                        if (this.combo > 1) this.showCombo(this.combo);
+                        
+                        AudioSys.playCollect();
+                        this.createParticles(s.x, s.y, '#ffd700', 5);
+                        this.stars.splice(i, 1);
+
+                        // 里程碑检查
+                        if (Math.floor(this.score) % 500 === 0 && this.score > 0) {
+                             this.showMilestone("SPEED UP!");
+                        }
+                    } else if (s.x < -50) {
+                        this.stars.splice(i, 1);
+                        this.combo = 0; // 漏掉星星中断连击
+                    }
+                }
+
+                // 更新粒子
+                for(let i=this.particles.length-1; i>=0; i--) {
+                    let p = this.particles[i];
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vy += 0.2; // 重力
+                    p.life--;
+                    if(p.life <= 0) this.particles.splice(i, 1);
+                }
+            }
+
+            checkCollision(r1, r2) {
+                const padding = 10;
+                return (r1.x + padding < r2.x + r2.w - padding &&
+                        r1.x + r1.w - padding > r2.x + padding &&
+                        r1.y + padding < r2.y + r2.h - padding &&
+                        r1.y + r1.h - padding > r2.y + padding);
+            }
+
+            createParticles(x, y, color, count) {
+                for(let i=0; i<count; i++) {
+                    this.particles.push({
+                        x: x + 15, y: y + 15,
+                        vx: (Math.random()-0.5)*10,
+                        vy: (Math.random()-0.5)*10,
+                        life: 30, color: color
+                    });
+                }
+            }
+
+            draw() {
+                ctx.clearRect(0, 0, width, height);
+
+                // 地面
                 ctx.beginPath();
-                ctx.moveTo(obs.x - 5, obs.y + 20);
-                ctx.lineTo(obs.x + 35, obs.y + 20);
-                ctx.moveTo(obs.x - 5, obs.y + 10);
-                ctx.lineTo(obs.x + 35, obs.y + 30);
+                ctx.moveTo(0, this.groundY);
+                // 动态波浪地面
+                for(let i=0; i<=width; i+=10) {
+                    ctx.lineTo(i, this.groundY + Math.sin(i/50 + Date.now()/500)*2);
+                }
+                ctx.lineTo(width, height);
+                ctx.lineTo(0, height);
+                ctx.fillStyle = '#fdfbf7';
+                ctx.fill();
+                
+                ctx.beginPath();
+                ctx.moveTo(0, this.groundY);
+                for(let i=0; i<=width; i+=10) {
+                    ctx.lineTo(i, this.groundY + Math.sin(i/50 + Date.now()/500)*2);
+                }
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 3;
+                ctx.setLineDash([5, 5]); // 虚线风格
                 ctx.stroke();
-            });
+                ctx.setLineDash([]);
 
-            // 绘制物品
-            items.forEach(item => {
-                ctx.save();
-                ctx.translate(item.x + item.w/2, item.y + item.h/2);
-                ctx.rotate(item.angle);
-                if (item.type === 'star') {
+                // 绘制背景装饰
+                this.bgDecor.forEach(bg => {
+                    ctx.fillStyle = bg.type === 'cloud' ? '#fff' : 'rgba(0,0,0,0.1)';
+                    if (bg.type === 'cloud') {
+                        drawSketchCircle(ctx, bg.x, bg.y, bg.size, '#fff', true);
+                        drawSketchCircle(ctx, bg.x+20, bg.y+5, bg.size*0.8, '#fff', true);
+                    } else {
+                        ctx.font = bg.size + "px Arial";
+                        ctx.fillText("♪", bg.x, bg.y);
+                    }
+                });
+
+                // 绘制星星
+                this.stars.forEach(s => {
+                    ctx.save();
+                    ctx.translate(s.x+15, s.y+15);
+                    ctx.rotate(Date.now()/200);
                     ctx.fillStyle = '#ffd700';
                     ctx.font = "30px Arial";
                     ctx.fillText("★", -15, 10);
-                } else {
-                    // 护盾图标
-                    ctx.fillStyle = '#4a90e2';
-                    ctx.font = "26px Arial";
-                    ctx.fillText("🛡️", -15, 10);
-                }
-                ctx.restore();
-            });
+                    ctx.restore();
+                });
 
-            // 粒子
-            particles.forEach(p => {
-                ctx.fillStyle = p.color;
-                ctx.globalAlpha = Math.max(0, p.life / 40);
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
-                ctx.fill();
-                ctx.globalAlpha = 1;
-            });
+                // 绘制障碍
+                this.obstacles.forEach(o => {
+                    ctx.fillStyle = '#333';
+                    ctx.font = "40px Arial";
+                    ctx.fillText("♩", o.x, o.y + 35);
+                    // 愤怒符号
+                    ctx.strokeStyle = '#ff4757';
+                    drawSketchLine(ctx, o.x, o.y, o.x+30, o.y+30, '#ff4757');
+                    drawSketchLine(ctx, o.x+30, o.y, o.x, o.y+30, '#ff4757');
+                });
 
-            drawMimi(ctx, mimi.x, mimi.y, mimi.w, mimi.h);
+                // 绘制吉他咪 (核心美工)
+                this.drawMimi();
 
-            // 气泡
-            if (mimi.phraseTimer > 0) {
-                mimi.phraseTimer--;
-                const x = mimi.x + 40;
-                const y = mimi.y - 40;
+                // 绘制粒子
+                this.particles.forEach(p => {
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.life/6, 0, Math.PI*2);
+                    ctx.fill();
+                });
+            }
+
+            drawMimi() {
+                const { x, y, w, h } = this.mimi;
                 ctx.save();
-                ctx.font = "20px 'Zcool KuaiLe'";
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-                ctx.strokeStyle = '#333';
-                ctx.lineWidth = 2;
-                const text = mimi.phrase;
-                const tw = ctx.measureText(text).width;
+                ctx.translate(x + w/2, y + h/2);
+
+                // 动作倾斜
+                let rotation = 0;
+                if (!this.mimi.grounded) {
+                    rotation = this.mimi.jumpCount === 2 ? Date.now()/100 : -0.2;
+                } else {
+                    rotation = Math.sin(Date.now()/100) * 0.1;
+                }
+                if (this.state === 'GAMEOVER') rotation = Math.PI / 2; // 倒下
+                ctx.rotate(rotation);
+
+                // --- 如需替换为原图，请注释掉下方绘制代码，使用: ---
+                // const img = new Image(); img.src = 'your_image_path.png';
+                // ctx.drawImage(img, -w/2, -h/2, w, h);
+                // --------------------------------------------------
+
+                // 1. 身体 (白色圆润，手绘描边)
+                ctx.fillStyle = '#fff';
                 ctx.beginPath();
-                ctx.roundRect(x, y - 20, tw + 20, 30, 10);
-                ctx.fill(); ctx.stroke();
-                ctx.fillStyle = '#000';
-                ctx.fillText(text, x + 10, y + 2);
-                // 小三角
-                ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x+10, y+10); ctx.lineTo(x+10, y-5); ctx.fill(); ctx.stroke();
+                ctx.ellipse(0, 5, w/2, h/2-5, 0, 0, Math.PI*2);
+                ctx.fill();
+                drawSketchCircle(ctx, 0, 5, w/2-2, '#333'); // 身体轮廓
+
+                // 2. 耳朵
+                const drawEar = (dx, dy) => {
+                    ctx.beginPath();
+                    ctx.moveTo(dx, -h/2 + 10);
+                    ctx.lineTo(dx + (dx>0?10:-10), -h/2 - 10);
+                    ctx.lineTo(dx + (dx>0?20:-20), -h/2 + 15);
+                    ctx.fillStyle = '#fff'; ctx.fill();
+                    ctx.strokeStyle = '#333'; ctx.lineWidth = 2; ctx.stroke();
+                }
+                drawEar(-15); drawEar(15);
+
+                // 3. 表情
+                if (this.state === 'GAMEOVER') {
+                    ctx.fillStyle = '#333';
+                    ctx.fillText("x  x", -15, 0);
+                } else {
+                    // 眼睛
+                    ctx.fillStyle = '#000';
+                    const eyeY = -5 + Math.sin(Date.now()/200)*2; // 眼睛微动
+                    ctx.beginPath(); ctx.arc(-12, eyeY, 3, 0, Math.PI*2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(12, eyeY, 3, 0, Math.PI*2); ctx.fill();
+                    
+                    // 腮红
+                    ctx.fillStyle = '#ffb7b2';
+                    ctx.globalAlpha = 0.6;
+                    ctx.beginPath(); ctx.arc(-18, 5, 6, 0, Math.PI*2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(18, 5, 6, 0, Math.PI*2); ctx.fill();
+                    ctx.globalAlpha = 1.0;
+
+                    // 嘴巴 (Fever时张开)
+                    if (this.isFever) {
+                        ctx.beginPath(); ctx.arc(0, 5, 5, 0, Math.PI); ctx.stroke();
+                    }
+                }
+
+                // 4. 吉他 (粉色)
+                ctx.save();
+                ctx.rotate(-0.4);
+                // 琴身
+                ctx.fillStyle = '#ffafc0';
+                drawSketchCircle(ctx, 5, 20, 14, '#ffafc0', true); 
+                // 琴颈
+                ctx.fillStyle = '#555';
+                ctx.fillRect(10, 15, 30, 8);
+                // 手 (圆球)
+                ctx.fillStyle = '#fff'; ctx.strokeStyle='#333';
+                ctx.beginPath(); ctx.arc(0, 15, 6, 0, Math.PI*2); ctx.fill(); ctx.stroke(); // 左手
+                ctx.beginPath(); ctx.arc(25, 18, 6, 0, Math.PI*2); ctx.fill(); ctx.stroke(); // 右手
+                
+                // 发光特效 (Fever)
+                if (this.isFever) {
+                    ctx.globalCompositeOperation = 'screen';
+                    ctx.fillStyle = `rgba(255, 255, 0, ${Math.abs(Math.sin(Date.now()/100))})`;
+                    ctx.beginPath(); ctx.arc(5, 20, 20, 0, Math.PI*2); ctx.fill();
+                    ctx.globalCompositeOperation = 'source-over';
+                }
+                ctx.restore();
+
+                // 5. 气泡
+                if (this.mimi.phraseTimer > 0) {
+                    this.mimi.phraseTimer--;
+                    ctx.rotate(-rotation); // 气泡不旋转
+                    const tx = 40, ty = -40;
+                    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+                    ctx.strokeStyle = '#333';
+                    ctx.lineWidth = 2;
+                    const w = ctx.measureText(this.mimi.phrase).width + 20;
+                    ctx.beginPath();
+                    ctx.roundRect(tx, ty - 20, w, 30, 10);
+                    ctx.fill(); ctx.stroke();
+                    ctx.fillStyle = '#333';
+                    ctx.font = "16px Zcool KuaiLe";
+                    ctx.fillText(this.mimi.phrase, tx + 10, ty);
+                    // 尾巴
+                    ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(10, -10); ctx.lineTo(tx+10, ty); ctx.fill(); ctx.stroke();
+                }
+
                 ctx.restore();
             }
-        }
 
-        function loop(timestamp) {
-            // 计算Delta Time (秒)
-            const dt = (timestamp - lastTime) / 1000;
-            lastTime = timestamp;
-
-            // 限制最大dt防止切屏后瞬移
-            const safeDt = Math.min(dt, 0.1);
-
-            update(safeDt);
-            draw();
-            frameId = requestAnimationFrame(loop);
-        }
-
-        // --- 游戏控制 ---
-
-        function action() {
-            if (state !== 'PLAYING') return;
-            
-            // 地面跳跃
-            if (mimi.grounded) {
-                mimi.dy = JUMP_FORCE;
-                mimi.grounded = false;
-                mimi.jumpCount = 1;
-                playGuitarNote(false);
-                createParticles(mimi.x + mimi.w/2, mimi.y + mimi.h, '#ddd', 5);
-            } 
-            // 二段跳
-            else if (mimi.jumpCount < mimi.maxJumps) {
-                mimi.dy = JUMP_FORCE * 0.9; // 二段跳稍微低一点
-                mimi.jumpCount++;
-                playGuitarNote(true);
-                createParticles(mimi.x + mimi.w/2, mimi.y + mimi.h, '#ffafc0', 8); // 粉色粒子
-                
-                // 旋转动画重置
-                // 简单的旋转效果在draw里处理
-            }
-        }
-
-        function startGame() {
-            initAudio();
-            state = 'PLAYING';
-            startScreen.style.display = 'none';
-            gameOverScreen.style.display = 'none';
-            shieldUi.style.display = 'none';
-            document.body.classList.remove('shake-screen');
-            
-            score = 0;
-            scoreEl.innerText = 0;
-            speedMultiplier = 1;
-            obstacles = [];
-            items = [];
-            particles = [];
-            bgElements = [];
-            
-            mimi.y = height - GROUND_H - mimi.h;
-            mimi.dy = 0;
-            mimi.grounded = true;
-            mimi.hasShield = false;
-            lastTime = performance.now();
-
-            mimi.phrase = "好吧！";
-            mimi.phraseTimer = 100;
-        }
-
-        function gameOver() {
-            state = 'GAMEOVER';
-            document.body.classList.add('shake-screen'); // CSS震动
-            playSoundEffect('crash');
-            
-            mimi.phrase = "讨厌你！";
-            mimi.phraseTimer = 200;
-            
-            // 强制重绘一帧以显示气泡
-            draw();
-
-            setTimeout(() => {
-                finalScoreEl.innerText = "得分: " + score;
-                gameOverScreen.style.display = 'block';
-            }, 800);
-        }
-
-        // 输入处理
-        function handleInput(e) {
-            if (state === 'START' || state === 'GAMEOVER') {
-                // 简单的防误触
-                if (e.type === 'touchstart') {
-                    setTimeout(startGame, 100);
-                } else {
-                    startGame();
+            input() {
+                if (this.state === 'PLAYING') {
+                    if (this.mimi.grounded) {
+                        this.mimi.dy = -750;
+                        this.mimi.grounded = false;
+                        this.mimi.jumpCount = 1;
+                        AudioSys.playJump();
+                        this.createParticles(this.mimi.x+30, this.mimi.y+60, '#ccc', 5);
+                    } else if (this.mimi.jumpCount < 2) {
+                        this.mimi.dy = -700;
+                        this.mimi.jumpCount = 2;
+                        AudioSys.playJump();
+                        this.createParticles(this.mimi.x+30, this.mimi.y+30, '#ffafc0', 8);
+                        // 二段跳时显示音符特效
+                        this.bgDecor.push({x: this.mimi.x, y: this.mimi.y, type:'note', size: 20, speed: 50});
+                    }
                 }
-            } else {
-                action();
+            }
+
+            loop(timestamp) {
+                const dt = Math.min((timestamp - this.lastTime) / 1000, 0.1);
+                this.lastTime = timestamp;
+                this.update(dt);
+                this.draw();
+                requestAnimationFrame(this.loop);
             }
         }
+
+        const game = new Game();
+
+        // 事件监听
+        ['mousedown', 'touchstart'].forEach(evt => 
+            window.addEventListener(evt, (e) => {
+                if(game.state === 'PLAYING') {
+                    e.preventDefault();
+                    game.input();
+                }
+            }, {passive: false})
+        );
 
         window.addEventListener('keydown', (e) => {
-            if (e.code === 'Space') handleInput(e);
+            if(e.code === 'Space') game.input();
         });
-
-        window.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            handleInput(e);
-        }, {passive: false});
-
-        window.addEventListener('mousedown', handleInput);
-        window.addEventListener('resize', resize);
-
-        resize();
-        requestAnimationFrame(loop); // 启动循环
 
     </script>
 </body>

@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>吉他咪的音乐之旅</title>
+    <title>吉他咪的音乐之旅 - 升级版</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Zcool+KuaiLe&display=swap');
 
         body {
             margin: 0;
             padding: 0;
-            background-color: #fff;
+            background-color: #fff; /* 初始背景 */
             overflow: hidden;
-            font-family: 'Zcool KuaiLe', sans-serif, cursive; /* 可爱字体 */
-            touch-action: none; /* 禁止手机下拉刷新 */
+            font-family: 'Zcool KuaiLe', sans-serif, cursive;
+            touch-action: none;
             user-select: none;
             -webkit-user-select: none;
         }
@@ -36,6 +36,7 @@
             justify-content: center;
             align-items: center;
             text-align: center;
+            transition: opacity 0.3s;
         }
 
         .title {
@@ -48,11 +49,12 @@
 
         .subtitle {
             font-size: 18px;
-            color: #666;
+            color: #555;
             margin-bottom: 40px;
-            background: rgba(255,255,255,0.8);
-            padding: 5px 15px;
+            background: rgba(255,255,255,0.9);
+            padding: 8px 20px;
             border-radius: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
         }
 
         .score-board {
@@ -61,6 +63,23 @@
             right: 20px;
             font-size: 24px;
             color: #333;
+            background: rgba(255,255,255,0.8);
+            padding: 5px 10px;
+            border-radius: 10px;
+            pointer-events: none;
+        }
+
+        /* 护盾UI */
+        .shield-status {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 20px;
+            color: #4a90e2;
+            display: none; /* 默认隐藏 */
+            align-items: center;
+            gap: 5px;
+            pointer-events: none;
         }
 
         @keyframes float {
@@ -69,10 +88,23 @@
             100% { transform: translateY(0px); }
         }
 
-        /* 移动端适配 */
-        @media (max-width: 600px) {
-            .title { font-size: 32px; }
-            .subtitle { font-size: 14px; }
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+
+        .shake-screen {
+            animation: shake 0.5s;
+            animation-iteration-count: 1;
         }
     </style>
 </head>
@@ -81,17 +113,18 @@
     <div id="ui-layer">
         <div id="start-screen">
             <div class="title">🎸 吉他咪的音乐之旅 🎵</div>
-            <div class="subtitle">点击屏幕或按空格跳跃</div>
-            <div style="font-size: 20px; color: #ff6b6b; animation: blink 1s infinite;">点击任意处开始</div>
+            <div class="subtitle">点击跳跃 / 空中再次点击二段跳</div>
+            <div style="font-size: 20px; color: #ff6b6b; animation: blink 1s infinite;">点击屏幕开始</div>
         </div>
         <div id="game-over-screen" style="display: none;">
-            <div class="title">哎呀！走音了！</div>
+            <div class="title" style="color:#ff4757">哎呀！走音了！</div>
             <div class="subtitle" id="final-score">得分: 0</div>
-            <div style="font-size: 20px; color: #333;">点击重试</div>
+            <div style="font-size: 20px; color: #333;">点击任意处重试</div>
         </div>
     </div>
 
     <div class="score-board">✨ <span id="score">0</span></div>
+    <div class="shield-status" id="shield-ui">🛡️ 护盾激活</div>
     <canvas id="gameCanvas"></canvas>
 
     <script>
@@ -103,17 +136,23 @@
         const gameOverScreen = document.getElementById('game-over-screen');
         const scoreEl = document.getElementById('score');
         const finalScoreEl = document.getElementById('final-score');
+        const shieldUi = document.getElementById('shield-ui');
 
         let width, height;
         let frameId;
         let score = 0;
-        let gameSpeed = 5;
+        
+        // 时间控制 (Delta Time)
+        let lastTime = 0;
+        let speedMultiplier = 1; // 随时间增加难度
+
         let state = 'START'; // START, PLAYING, GAMEOVER
 
-        // 物理参数
-        const gravity = 0.6;
-        const jumpStrength = -10; // 跳跃力度
-        const groundHeight = 100;
+        // 物理常数 (基于60FPS标准化的数值)
+        const BASE_SPEED = 300; // 像素/秒
+        const GRAVITY = 1800;   // 像素/秒^2
+        const JUMP_FORCE = -750;
+        const GROUND_H = 100;
 
         // 角色：吉他咪
         const mimi = {
@@ -121,21 +160,26 @@
             y: 0,
             w: 60,
             h: 60,
-            dy: 0,
+            dy: 0, // 垂直速度
             grounded: false,
-            rotation: 0,
-            phrase: "", // 口头禅
-            phraseTimer: 0
+            jumpCount: 0, // 二段跳计数
+            maxJumps: 2,
+            hasShield: false,
+            phrase: "", 
+            phraseTimer: 0,
+            invincibleTimer: 0 // 受伤后的短暂无敌
         };
 
         // 游戏对象
         let obstacles = [];
-        let stars = [];
+        let items = []; // 星星和护盾
         let particles = [];
+        let bgElements = []; // 云朵、山脉
 
-        // 音频上下文 (Web Audio API)
+        // 音频上下文
         let audioCtx;
-        const scale = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25]; // C大调五声
+        // C大调五声 + 高八度
+        const scale = [261.6, 293.6, 329.6, 392.0, 440.0, 523.2, 587.3, 659.2]; 
         let noteIndex = 0;
 
         // --- 核心功能函数 ---
@@ -145,8 +189,10 @@
             height = window.innerHeight;
             canvas.width = width;
             canvas.height = height;
-            mimi.y = height - groundHeight - mimi.h;
-            mimi.x = width * 0.15; // 咪的位置在屏幕左侧15%
+            if (state === 'START') {
+                mimi.y = height - GROUND_H - mimi.h;
+                mimi.x = width * 0.15;
+            }
         }
 
         function initAudio() {
@@ -155,200 +201,266 @@
             }
         }
 
-        function playGuitarNote() {
+        // 播放吉他音（加入随机轻微失谐，更有手感）
+        function playGuitarNote(isDoubleJump) {
             if (!audioCtx) return;
             if (audioCtx.state === 'suspended') audioCtx.resume();
 
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
             
-            // 吉他音色模拟 (简单的三角波+衰减)
-            osc.type = 'triangle';
-            osc.frequency.value = scale[noteIndex % scale.length];
+            osc.type = 'triangle'; // 三角波接近吉他/长笛
+            
+            // 音高选择
+            let freq = scale[noteIndex % scale.length];
+            if (isDoubleJump) freq *= 1.5; // 二段跳音高更高
+            
+            osc.frequency.value = freq;
             noteIndex++;
 
-            gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+            // 音量包络
+            const now = audioCtx.currentTime;
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(0.2, now + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
 
             osc.connect(gain);
             gain.connect(audioCtx.destination);
             osc.start();
-            osc.stop(audioCtx.currentTime + 0.5);
+            osc.stop(now + 0.6);
         }
 
-        function playCrashSound() {
+        function playSoundEffect(type) {
             if (!audioCtx) return;
+            const now = audioCtx.currentTime;
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
-            osc.type = 'sawtooth';
-            osc.frequency.value = 100;
-            osc.frequency.linearRampToValueAtTime(50, audioCtx.currentTime + 0.3);
-            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-            gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.start();
-            osc.stop(audioCtx.currentTime + 0.3);
-        }
-
-        function playStarSound() {
-            if (!audioCtx) return;
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.type = 'sine';
-            osc.frequency.value = 880;
-            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-            gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.1);
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.start();
-            osc.stop(audioCtx.currentTime + 0.1);
-        }
-
-        // 随机抖动函数 (模仿手绘线条)
-        function j(val) {
-            return val + (Math.random() - 0.5) * 2;
-        }
-
-        // 绘制吉他咪
-        function drawMimiChar(ctx, x, y, w, h) {
-            ctx.save();
-            ctx.translate(x + w/2, y + h/2);
-            // 跑步时的轻微摇摆
-            if (state === 'PLAYING' && mimi.grounded) {
-                ctx.rotate(Math.sin(Date.now() / 100) * 0.1);
-            } else {
-                ctx.rotate(mimi.dy * 0.05); // 跳跃时倾斜
+            
+            if (type === 'collect') { // 叮
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(880, now);
+                osc.frequency.exponentialRampToValueAtTime(1760, now + 0.1);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.2);
+            } else if (type === 'shield') { // 护盾音效
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(440, now);
+                osc.frequency.linearRampToValueAtTime(660, now + 0.2);
+                gain.gain.setValueAtTime(0.05, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.3);
+            } else if (type === 'crash') { // 撞击
+                osc.type = 'sawtooth';
+                osc.frequency.value = 100;
+                osc.frequency.linearRampToValueAtTime(20, now + 0.4);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.4);
+            } else if (type === 'break_shield') { // 碎盾
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(300, now);
+                osc.frequency.linearRampToValueAtTime(100, now + 0.2);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.2);
             }
 
-            // 身体 (白色，黑色描边，蜡笔质感)
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(now + 0.5);
+        }
+
+        // 手绘风格抖动
+        function j(val, intensity = 1.5) {
+            return val + (Math.random() - 0.5) * intensity;
+        }
+
+        // --- 绘制函数 ---
+
+        function drawMimi(ctx, x, y, w, h) {
+            ctx.save();
+            ctx.translate(x + w/2, y + h/2);
+            
+            // 受伤闪烁
+            if (mimi.invincibleTimer > 0 && Math.floor(Date.now()/50)%2===0) {
+                ctx.globalAlpha = 0.5;
+            }
+
+            // 跑步/跳跃姿态
+            if (state === 'PLAYING' && mimi.grounded) {
+                ctx.rotate(Math.sin(Date.now() / 80) * 0.15);
+            } else {
+                // 二段跳翻滚
+                if (mimi.jumpCount === 2) {
+                    ctx.rotate(Date.now() / 100); 
+                } else {
+                    ctx.rotate(-0.1); // 普通跳跃前倾
+                }
+            }
+
+            // 护盾光环
+            if (mimi.hasShield) {
+                ctx.beginPath();
+                ctx.arc(0, 0, w/2 + 10, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(74, 144, 226, ${0.5 + Math.sin(Date.now()/200)*0.2})`;
+                ctx.lineWidth = 4;
+                ctx.stroke();
+            }
+
+            // 身体
             ctx.beginPath();
             ctx.fillStyle = '#fff';
             ctx.strokeStyle = '#222';
             ctx.lineWidth = 3;
-            // 简单的圆润矩形模拟猫身体
             ctx.ellipse(0, 5, w/2, h/2 - 5, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.stroke();
+            ctx.fill(); ctx.stroke();
 
             // 耳朵
-            ctx.beginPath();
-            ctx.moveTo(j(-20), j(-20));
-            ctx.lineTo(j(-25), j(-35));
-            ctx.lineTo(j(-10), j(-25));
-            ctx.fillStyle = '#fff';
-            ctx.fill();
-            ctx.stroke(); // 左耳
+            const drawEar = (direction) => {
+                ctx.beginPath();
+                const d = direction; // -1 or 1
+                ctx.moveTo(j(d*20), j(-20));
+                ctx.lineTo(j(d*25), j(-35));
+                ctx.lineTo(j(d*10), j(-25));
+                ctx.fillStyle = '#fff'; ctx.fill(); ctx.stroke();
+            };
+            drawEar(-1); drawEar(1);
 
-            ctx.beginPath();
-            ctx.moveTo(j(20), j(-20));
-            ctx.lineTo(j(25), j(-35));
-            ctx.lineTo(j(10), j(-25));
-            ctx.fillStyle = '#fff';
-            ctx.fill();
-            ctx.stroke(); // 右耳
-
-            // 眼睛
+            // 表情
             ctx.fillStyle = '#000';
-            ctx.beginPath(); ctx.arc(j(-10), j(-5), 3, 0, Math.PI*2); ctx.fill();
-            ctx.beginPath(); ctx.arc(j(10), j(-5), 3, 0, Math.PI*2); ctx.fill();
+            if (state === 'GAMEOVER') {
+                // 晕倒眼 x x
+                ctx.font = "20px Arial";
+                ctx.fillText("x", -20, 0);
+                ctx.fillText("x", 10, 0);
+            } else {
+                // 豆豆眼
+                ctx.beginPath(); ctx.arc(j(-12), j(-5), 3, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(j(12), j(-5), 3, 0, Math.PI*2); ctx.fill();
+            }
 
             // 腮红
             ctx.fillStyle = '#ffb7b2';
-            ctx.beginPath(); ctx.arc(j(-15), j(0), 4, 0, Math.PI*2); ctx.fill();
-            ctx.beginPath(); ctx.arc(j(15), j(0), 4, 0, Math.PI*2); ctx.fill();
+            ctx.globalAlpha = 0.8;
+            ctx.beginPath(); ctx.arc(j(-18), j(2), 5, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(j(18), j(2), 5, 0, Math.PI*2); ctx.fill();
+            ctx.globalAlpha = 1.0;
 
-            // 吉他 (粉色)
+            // 吉他
             ctx.save();
-            ctx.rotate(-0.2);
+            ctx.rotate(-0.3);
             ctx.fillStyle = '#ffafc0';
             ctx.strokeStyle = '#222';
-            // 吉他琴身
-            ctx.beginPath();
-            ctx.arc(5, 15, 12, 0, Math.PI*2);
-            ctx.fill(); ctx.stroke();
-            // 琴颈
-            ctx.fillStyle = '#444';
-            ctx.fillRect(10, 10, 25, 6);
-            // 琴头
-            ctx.fillRect(35, 8, 5, 10);
+            ctx.beginPath(); ctx.arc(8, 18, 14, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = '#555';
+            ctx.fillRect(13, 13, 28, 7); // 琴颈
+            ctx.fillStyle = '#fff'; // 琴弦
+            ctx.fillRect(15, 15, 20, 1);
             ctx.restore();
 
-            // 手 (拿着吉他)
+            // 手
             ctx.strokeStyle = '#222';
-            ctx.beginPath(); ctx.arc(-10, 10, 5, 0, Math.PI); ctx.stroke(); // 左手
-            ctx.beginPath(); ctx.arc(10, 12, 5, 0, Math.PI); ctx.stroke(); // 右手
+            ctx.beginPath(); ctx.arc(-12, 12, 6, 0, Math.PI); ctx.stroke();
+            ctx.beginPath(); ctx.arc(12, 14, 6, 0, Math.PI); ctx.stroke();
 
             ctx.restore();
         }
 
-        // 口头禅气泡
-        function drawBubble(ctx) {
-            if (mimi.phraseTimer > 0) {
-                mimi.phraseTimer--;
-                const x = mimi.x + 40;
-                const y = mimi.y - 30;
-                
-                ctx.save();
-                ctx.font = "20px 'Zcool KuaiLe'";
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-                ctx.strokeStyle = '#333';
-                ctx.lineWidth = 2;
-                
-                const text = mimi.phrase;
-                const textWidth = ctx.measureText(text).width;
-                
-                // 气泡背景
+        // 背景绘制 (视差滚动)
+        function drawBackground(ctx) {
+            // 天空
+            const grad = ctx.createLinearGradient(0, 0, 0, height);
+            grad.addColorStop(0, '#e0f7fa');
+            grad.addColorStop(1, '#ffffff');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0,0, width, height);
+
+            // 绘制背景元素
+            bgElements.forEach(el => {
+                ctx.fillStyle = el.type === 'cloud' ? 'rgba(255,255,255,0.8)' : '#dcedc8';
                 ctx.beginPath();
-                ctx.roundRect(x, y - 20, textWidth + 20, 30, 10);
+                if (el.type === 'cloud') {
+                    ctx.arc(el.x, el.y, el.size, 0, Math.PI*2);
+                    ctx.arc(el.x + el.size, el.y - el.size*0.5, el.size*0.8, 0, Math.PI*2);
+                    ctx.arc(el.x + el.size*2, el.y, el.size*0.9, 0, Math.PI*2);
+                } else {
+                    // 山
+                    ctx.moveTo(el.x, height - GROUND_H);
+                    ctx.lineTo(el.x + el.size, height - GROUND_H - el.size);
+                    ctx.lineTo(el.x + el.size*2, height - GROUND_H);
+                }
                 ctx.fill();
-                ctx.stroke();
-                
-                // 文字
-                ctx.fillStyle = '#000';
-                ctx.fillText(text, x + 10, y + 2);
-                ctx.restore();
-            }
+            });
         }
 
-        // 游戏逻辑更新
-        function update() {
+        // --- 逻辑更新 (Delta Time) ---
+        
+        function update(dt) {
+            // dt 是秒为单位 (例如 0.016)
             if (state !== 'PLAYING') return;
 
-            // 增加难度
-            gameSpeed += 0.002;
+            // 难度随时间缓慢增加
+            speedMultiplier += dt * 0.02;
+            const currentSpeed = BASE_SPEED * speedMultiplier;
 
-            // 咪的物理
-            mimi.dy += gravity;
-            mimi.y += mimi.dy;
-
-            // 地面碰撞
-            if (mimi.y + mimi.h > height - groundHeight) {
-                mimi.y = height - groundHeight - mimi.h;
-                mimi.dy = 0;
-                mimi.grounded = true;
-            } else {
-                mimi.grounded = false;
-            }
-
-            // 生成障碍物 (走音符号)
-            if (Math.random() < 0.015) {
-                obstacles.push({
-                    x: width,
-                    y: height - groundHeight - 40, // 地面障碍
-                    w: 30,
-                    h: 40,
-                    type: 'note' 
+            // 背景生成
+            if (Math.random() < 0.02) {
+                bgElements.push({
+                    x: width + 100,
+                    y: Math.random() * height * 0.5,
+                    size: 30 + Math.random() * 50,
+                    speed: 20 + Math.random() * 30, // 慢速
+                    type: Math.random() > 0.5 ? 'cloud' : 'mountain'
                 });
             }
 
-            // 生成星星
+            // 背景移动
+            for (let i = bgElements.length - 1; i >= 0; i--) {
+                let el = bgElements[i];
+                el.x -= el.speed * dt;
+                if (el.x < -200) bgElements.splice(i, 1);
+            }
+
+            // 咪的物理
+            mimi.dy += GRAVITY * dt;
+            mimi.y += mimi.dy * dt;
+
+            // 地面检测
+            if (mimi.y + mimi.h > height - GROUND_H) {
+                mimi.y = height - GROUND_H - mimi.h;
+                mimi.dy = 0;
+                mimi.grounded = true;
+                mimi.jumpCount = 0; // 重置多段跳
+            } else {
+                mimi.grounded = false;
+            }
+            
+            // 无敌时间倒计时
+            if (mimi.invincibleTimer > 0) mimi.invincibleTimer -= dt;
+
+            // 障碍物生成 (走音符)
+            // 间隔生成：距离越远生成概率越高，避免重叠
+            const lastObs = obstacles[obstacles.length-1];
+            let minSafeDist = 400;
+            if (!lastObs || (width - lastObs.x > minSafeDist)) {
+                if (Math.random() < 0.015 * speedMultiplier) {
+                    obstacles.push({
+                        x: width,
+                        y: height - GROUND_H - 40,
+                        w: 30,
+                        h: 40,
+                        type: 'note'
+                    });
+                }
+            }
+
+            // 物品生成 (星星 & 护盾)
             if (Math.random() < 0.01) {
-                stars.push({
+                const isShield = Math.random() < 0.1; // 10%概率出护盾
+                items.push({
                     x: width,
-                    y: height - groundHeight - 100 - Math.random() * 100, // 空中
+                    y: height - GROUND_H - 80 - Math.random() * 120,
                     w: 30,
                     h: 30,
+                    type: isShield ? 'shield' : 'star',
                     angle: 0
                 });
             }
@@ -356,62 +468,82 @@
             // 更新障碍物
             for (let i = obstacles.length - 1; i >= 0; i--) {
                 let obs = obstacles[i];
-                obs.x -= gameSpeed;
+                obs.x -= currentSpeed * dt;
 
-                // 碰撞检测
-                if (
-                    mimi.x < obs.x + obs.w - 10 &&
-                    mimi.x + mimi.w > obs.x + 10 &&
-                    mimi.y < obs.y + obs.h - 10 &&
-                    mimi.y + mimi.h > obs.y + 10
+                // 碰撞检测 (稍微缩小判定框)
+                const hitMargin = 10;
+                if (mimi.invincibleTimer <= 0 &&
+                    mimi.x + hitMargin < obs.x + obs.w - hitMargin &&
+                    mimi.x + mimi.w - hitMargin > obs.x + hitMargin &&
+                    mimi.y + hitMargin < obs.y + obs.h - hitMargin &&
+                    mimi.y + mimi.h - hitMargin > obs.y + hitMargin
                 ) {
-                    gameOver();
+                    if (mimi.hasShield) {
+                        // 护盾碎裂逻辑
+                        mimi.hasShield = false;
+                        mimi.invincibleTimer = 1.0; // 无敌1秒
+                        shieldUi.style.display = 'none';
+                        playSoundEffect('break_shield');
+                        createParticles(mimi.x, mimi.y, '#4a90e2', 10);
+                        mimi.phrase = "好险！";
+                        mimi.phraseTimer = 60;
+                    } else {
+                        gameOver();
+                    }
                 }
 
                 if (obs.x + obs.w < 0) obstacles.splice(i, 1);
             }
 
-            // 更新星星
-            for (let i = stars.length - 1; i >= 0; i--) {
-                let star = stars[i];
-                star.x -= gameSpeed;
-                star.angle += 0.1;
+            // 更新物品
+            for (let i = items.length - 1; i >= 0; i--) {
+                let item = items[i];
+                item.x -= currentSpeed * dt;
+                item.angle += 2 * dt;
 
-                // 收集检测
                 if (
-                    mimi.x < star.x + star.w &&
-                    mimi.x + mimi.w > star.x &&
-                    mimi.y < star.y + star.h &&
-                    mimi.y + mimi.h > star.y
+                    mimi.x < item.x + item.w &&
+                    mimi.x + mimi.w > item.x &&
+                    mimi.y < item.y + item.h &&
+                    mimi.y + mimi.h > item.y
                 ) {
-                    score += 10;
-                    scoreEl.innerText = score;
-                    stars.splice(i, 1);
-                    createParticles(star.x, star.y, '#ffd700');
-                    playStarSound();
-                } else if (star.x + star.w < 0) {
-                    stars.splice(i, 1);
+                    if (item.type === 'star') {
+                        score += 10;
+                        scoreEl.innerText = score;
+                        createParticles(item.x, item.y, '#ffd700', 5);
+                        playSoundEffect('collect');
+                    } else if (item.type === 'shield') {
+                        mimi.hasShield = true;
+                        shieldUi.style.display = 'flex';
+                        createParticles(item.x, item.y, '#4a90e2', 8);
+                        playSoundEffect('shield');
+                        mimi.phrase = "安全感！";
+                        mimi.phraseTimer = 60;
+                    }
+                    items.splice(i, 1);
+                } else if (item.x < -50) {
+                    items.splice(i, 1);
                 }
             }
 
             // 更新粒子
             for (let i = particles.length - 1; i >= 0; i--) {
                 let p = particles[i];
-                p.x += p.vx;
-                p.y += p.vy;
-                p.life--;
+                p.x += p.vx * dt * 60; // Normalize to frames
+                p.y += p.vy * dt * 60;
+                p.life -= dt * 60;
                 if (p.life <= 0) particles.splice(i, 1);
             }
         }
 
-        function createParticles(x, y, color) {
-            for (let i = 0; i < 8; i++) {
+        function createParticles(x, y, color, count) {
+            for (let i = 0; i < count; i++) {
                 particles.push({
                     x: x,
                     y: y,
-                    vx: (Math.random() - 0.5) * 10,
-                    vy: (Math.random() - 0.5) * 10,
-                    life: 30,
+                    vx: (Math.random() - 0.5) * 8,
+                    vy: (Math.random() - 0.5) * 8,
+                    life: 30 + Math.random() * 20,
                     color: color
                 });
             }
@@ -421,92 +553,134 @@
         function draw() {
             ctx.clearRect(0, 0, width, height);
 
-            // 绘制地面线条
+            drawBackground(ctx);
+
+            // 地面
             ctx.beginPath();
-            ctx.moveTo(0, height - groundHeight);
-            // 手绘风格地面
+            ctx.moveTo(0, height - GROUND_H);
             for(let i=0; i<width; i+=20) {
-                ctx.lineTo(i, height - groundHeight + j(0));
+                ctx.lineTo(i, height - GROUND_H + j(0));
+            }
+            ctx.lineTo(width, height);
+            ctx.lineTo(0, height);
+            ctx.fillStyle = '#fcfcfc';
+            ctx.fill();
+            
+            // 地面描边
+            ctx.beginPath();
+            ctx.moveTo(0, height - GROUND_H);
+            for(let i=0; i<width; i+=20) {
+                ctx.lineTo(i, height - GROUND_H + j(0));
             }
             ctx.strokeStyle = '#333';
             ctx.lineWidth = 2;
             ctx.stroke();
 
-            // 绘制装饰 (背景里的小音符)
-            if (state === 'PLAYING' && Math.floor(Date.now() / 500) % 2 === 0) {
-                // 简单的背景动效
-            }
-
-            // 绘制障碍物 (涂鸦风格的黑色音符)
-            ctx.fillStyle = '#333';
+            // 绘制障碍物
             obstacles.forEach(obs => {
-                ctx.font = "30px Arial";
-                ctx.fillText("♩", obs.x, obs.y + 30);
-                // 乱糟糟的线表示“走音”
-                ctx.strokeStyle = '#000';
+                ctx.fillStyle = '#333';
+                ctx.font = "36px Arial";
+                ctx.fillText("♩", obs.x, obs.y + 35);
+                // 涂鸦杂线
+                ctx.strokeStyle = '#ff4757';
+                ctx.lineWidth = 2;
                 ctx.beginPath();
-                ctx.moveTo(obs.x - 5, obs.y + 15);
-                ctx.lineTo(obs.x + 35, obs.y + 15);
+                ctx.moveTo(obs.x - 5, obs.y + 20);
+                ctx.lineTo(obs.x + 35, obs.y + 20);
+                ctx.moveTo(obs.x - 5, obs.y + 10);
+                ctx.lineTo(obs.x + 35, obs.y + 30);
                 ctx.stroke();
             });
 
-            // 绘制星星
-            stars.forEach(star => {
+            // 绘制物品
+            items.forEach(item => {
                 ctx.save();
-                ctx.translate(star.x + star.w/2, star.y + star.h/2);
-                ctx.rotate(star.angle);
-                ctx.fillStyle = '#ffd700';
-                ctx.font = "30px Arial";
-                ctx.fillText("★", -15, 10);
+                ctx.translate(item.x + item.w/2, item.y + item.h/2);
+                ctx.rotate(item.angle);
+                if (item.type === 'star') {
+                    ctx.fillStyle = '#ffd700';
+                    ctx.font = "30px Arial";
+                    ctx.fillText("★", -15, 10);
+                } else {
+                    // 护盾图标
+                    ctx.fillStyle = '#4a90e2';
+                    ctx.font = "26px Arial";
+                    ctx.fillText("🛡️", -15, 10);
+                }
                 ctx.restore();
             });
 
-            // 绘制粒子
+            // 粒子
             particles.forEach(p => {
                 ctx.fillStyle = p.color;
-                ctx.globalAlpha = p.life / 30;
+                ctx.globalAlpha = Math.max(0, p.life / 40);
                 ctx.beginPath();
-                ctx.arc(p.x, p.y, 3, 0, Math.PI*2);
+                ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
                 ctx.fill();
                 ctx.globalAlpha = 1;
             });
 
-            // 绘制咪
-            drawMimiChar(ctx, mimi.x, mimi.y, mimi.w, mimi.h);
-            
-            // 绘制气泡
-            drawBubble(ctx);
+            drawMimi(ctx, mimi.x, mimi.y, mimi.w, mimi.h);
+
+            // 气泡
+            if (mimi.phraseTimer > 0) {
+                mimi.phraseTimer--;
+                const x = mimi.x + 40;
+                const y = mimi.y - 40;
+                ctx.save();
+                ctx.font = "20px 'Zcool KuaiLe'";
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 2;
+                const text = mimi.phrase;
+                const tw = ctx.measureText(text).width;
+                ctx.beginPath();
+                ctx.roundRect(x, y - 20, tw + 20, 30, 10);
+                ctx.fill(); ctx.stroke();
+                ctx.fillStyle = '#000';
+                ctx.fillText(text, x + 10, y + 2);
+                // 小三角
+                ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x+10, y+10); ctx.lineTo(x+10, y-5); ctx.fill(); ctx.stroke();
+                ctx.restore();
+            }
         }
 
-        function loop() {
-            update();
+        function loop(timestamp) {
+            // 计算Delta Time (秒)
+            const dt = (timestamp - lastTime) / 1000;
+            lastTime = timestamp;
+
+            // 限制最大dt防止切屏后瞬移
+            const safeDt = Math.min(dt, 0.1);
+
+            update(safeDt);
             draw();
             frameId = requestAnimationFrame(loop);
         }
 
-        // --- 游戏状态控制 ---
+        // --- 游戏控制 ---
 
-        function jump() {
+        function action() {
             if (state !== 'PLAYING') return;
             
+            // 地面跳跃
             if (mimi.grounded) {
-                mimi.dy = jumpStrength;
+                mimi.dy = JUMP_FORCE;
                 mimi.grounded = false;
-                playGuitarNote(); // 音乐元素：跳跃即弹奏
-                createParticles(mimi.x + mimi.w/2, mimi.y + mimi.h, '#ffafc0');
+                mimi.jumpCount = 1;
+                playGuitarNote(false);
+                createParticles(mimi.x + mimi.w/2, mimi.y + mimi.h, '#ddd', 5);
+            } 
+            // 二段跳
+            else if (mimi.jumpCount < mimi.maxJumps) {
+                mimi.dy = JUMP_FORCE * 0.9; // 二段跳稍微低一点
+                mimi.jumpCount++;
+                playGuitarNote(true);
+                createParticles(mimi.x + mimi.w/2, mimi.y + mimi.h, '#ffafc0', 8); // 粉色粒子
+                
+                // 旋转动画重置
+                // 简单的旋转效果在draw里处理
             }
-        }
-
-        function resetGame() {
-            score = 0;
-            gameSpeed = 5;
-            obstacles = [];
-            stars = [];
-            particles = [];
-            scoreEl.innerText = score;
-            mimi.y = height - groundHeight - mimi.h;
-            mimi.dy = 0;
-            noteIndex = 0;
         }
 
         function startGame() {
@@ -514,57 +688,73 @@
             state = 'PLAYING';
             startScreen.style.display = 'none';
             gameOverScreen.style.display = 'none';
-            resetGame();
+            shieldUi.style.display = 'none';
+            document.body.classList.remove('shake-screen');
             
-            // 触发口头禅
+            score = 0;
+            scoreEl.innerText = 0;
+            speedMultiplier = 1;
+            obstacles = [];
+            items = [];
+            particles = [];
+            bgElements = [];
+            
+            mimi.y = height - GROUND_H - mimi.h;
+            mimi.dy = 0;
+            mimi.grounded = true;
+            mimi.hasShield = false;
+            lastTime = performance.now();
+
             mimi.phrase = "好吧！";
-            mimi.phraseTimer = 60; // 显示60帧 (约1秒)
+            mimi.phraseTimer = 100;
         }
 
         function gameOver() {
             state = 'GAMEOVER';
-            playCrashSound();
+            document.body.classList.add('shake-screen'); // CSS震动
+            playSoundEffect('crash');
             
-            // 触发口头禅
             mimi.phrase = "讨厌你！";
-            mimi.phraseTimer = 120; 
-            drawBubble(ctx); // 强制绘制一次确保看到
+            mimi.phraseTimer = 200;
+            
+            // 强制重绘一帧以显示气泡
+            draw();
 
             setTimeout(() => {
                 finalScoreEl.innerText = "得分: " + score;
                 gameOverScreen.style.display = 'block';
-            }, 500);
+            }, 800);
         }
 
-        // --- 事件监听 ---
-
-        // 统一处理点击和触摸
+        // 输入处理
         function handleInput(e) {
             if (state === 'START' || state === 'GAMEOVER') {
-                startGame();
+                // 简单的防误触
+                if (e.type === 'touchstart') {
+                    setTimeout(startGame, 100);
+                } else {
+                    startGame();
+                }
             } else {
-                jump();
+                action();
             }
         }
 
         window.addEventListener('keydown', (e) => {
-            if (e.code === 'Space') handleInput();
+            if (e.code === 'Space') handleInput(e);
         });
 
         window.addEventListener('touchstart', (e) => {
-            e.preventDefault(); // 防止滚动
-            handleInput();
+            e.preventDefault();
+            handleInput(e);
         }, {passive: false});
 
         window.addEventListener('mousedown', handleInput);
-
         window.addEventListener('resize', resize);
 
-        // 启动
         resize();
-        loop();
+        requestAnimationFrame(loop); // 启动循环
 
     </script>
 </body>
-
 </html>
